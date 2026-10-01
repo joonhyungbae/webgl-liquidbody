@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>몸을 지나는 물</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%23bfe8ef'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+  <div class="left">
+    <div id="stage"><canvas id="out"></canvas></div>
+    <div class="bar">
+      <button id="restart">다시 처음부터</button>
+      <button id="rec">녹화 시작</button>
+      <button id="snap">사진 저장</button>
+      <button id="only">화면만</button>
+      <span class="fps" id="fps"></span>
+    </div>
+  </div>
+
+  <aside>
+    <div class="card">
+      <h2>무엇을 보나</h2>
+      <select id="source">
+        <option value="camera">카메라</option>
+        <option value="sim">가짜 사람</option>
+        <option value="file">영상 파일 열기…</option>
+      </select>
+      <input type="file" id="file" accept="video/*" hidden />
+      <div id="status">시작하는 중</div>
+    </div>
+
+    <div class="card">
+      <h2>감지한 것</h2>
+      <canvas id="preview" width="256" height="192"></canvas>
+      <div class="meter"><span>사람</span><i><b id="m-fill"></b></i><output id="v-fill"></output></div>
+      <div class="meter"><span>몸의 위</span><i><b id="m-top"></b></i><output id="v-top"></output></div>
+      <div class="meter"><span>몸의 아래</span><i><b id="m-bot"></b></i><output id="v-bot"></output></div>
+    </div>
+
+    <div class="card">
+      <h2>지금 단계 (시간 규칙은 web/water.js)</h2>
+      <div id="phase">기다림</div>
+      <div class="meter out"><span>채워진 정도</span><i><b id="m-filled"></b></i><output id="v-filled"></output></div>
+      <form id="sayform">
+        <input id="saytext" maxlength="60" placeholder="여기에 적으면 액체가 지워 갑니다" />
+        <button type="submit">띄우기</button>
+      </form>
+      <div class="hint">전시에서는 이 칸이 태블릿입니다. 적은 글은 이 브라우저에만 있고 어디로도 보내지 않습니다</div>
+    </div>
+
+    <div class="card">
+      <h2>조절</h2>
+      <div id="params"></div>
+      <button id="reset" style="margin-top:6px">처음 값으로</button>
+    </div>
+
+    <div class="card keys">
+      H 조절판 숨기기 · F 전체 화면 · R 녹화 · 스페이스 다시 처음부터<br />
+      조절한 값은 이 브라우저에 남습니다.
+    </div>
+  </aside>
+</div>
+<video id="video" playsinline muted></video>
+<script type="module" src="app.js"></script>
+</body>
+</html>

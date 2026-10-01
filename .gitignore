@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.DS_Store
+out.mp4
+out.webm
+
+# 모델은 커밋하지 않는다. 설치 스크립트(fetch_model.py)가 받아 온다.
+web/models/*
+!web/models/README.md
+
+# 시험용으로 넣어 본 영상은 커밋하지 않는다. 파일 열기 메뉴로 아무 영상이나 쓸 수 있다.
+web/sample/

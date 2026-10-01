@@ -1,0 +1,7 @@
+# conda 환경. ./install.sh 가 이 파일로 만들고, ./start.sh 가 이 환경으로 켠다.
+# 감지와 그림은 브라우저가 한다. 파이썬은 웹 서버와 모델 내려받기에만 쓴다.
+name: liquidbody
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
