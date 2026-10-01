@@ -213,7 +213,7 @@ function loop(now) {
       uTime: now / 1000,
       uBleed: p.bleed, uGrain: p.grain, uSoak: p.soak, uSurface: p.surface,
       uStars: p.stars, uWarm: p.warm, uPaper: p.paper,
-      uWaterTop: w.waterTop, uWaterBottom: w.waterBottom,
+      uWaterTop: w.waterTop, uWaterBottom: w.waterBottom, uFront: w.front,
       uRing: w.ring, uFade: w.fade, uMirror: p.mirror ? 1 : 0,
     });
 

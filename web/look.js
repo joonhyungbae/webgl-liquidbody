@@ -36,6 +36,7 @@ uniform float uWarm;         // 색 치우침
 uniform float uPaper;        // 종이결
 uniform float uWaterTop;     // 액체의 위 수면 (0 화면 위 ~ 1 아래)
 uniform float uWaterBottom;  // 액체의 아래 수면
+uniform float uFront;        // 지금 움직이고 있는 수면. 글은 이것이 지나갈 때 지워진다
 uniform float uRing;         // 결계. 0~1 로 퍼진다. 0 이면 없음
 uniform float uMirror;       // 1 이면 좌우를 뒤집어 거울처럼 본다
 uniform float uFade;         // 전체 밝기. 들어오고 나갈 때 쓴다
@@ -137,9 +138,12 @@ void main() {
     col += spark * ring * (1.0 - uRing) * 0.9;
   }
 
-  // 글자. 액체가 지나간 자리에서는 지워진다. 물이 차오르며 글이 사라지는 자리다
-  vec4 t = texture(uText, vec2(vUv.x, vUv.y));
-  float wash = smoothstep(top - 0.02, top + 0.06, uv.y);
+  // 글자. 움직이는 수면이 지나간 자리에서 지워진다. 물이 차오르며 글이 사라지는 자리다
+  // 글자 그림판은 위가 0 이다. 화면 좌표(uv)와 같은 방향으로 읽어야 뒤집히지 않는다
+  vec4 t = texture(uText, uv);
+  // 수면이 글자의 높이를 지나가면 그 자리부터 지워진다
+  float edgeY = uFront + ripple;
+  float wash = smoothstep(uv.y - 0.05, uv.y + 0.02, edgeY);
   float letters = t.a * (1.0 - wash);
   col = mix(col, wet * 1.05, letters * 0.9);
 

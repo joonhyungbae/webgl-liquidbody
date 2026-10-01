@@ -105,6 +105,9 @@ export class Water {
     }
 
     const filled = Math.max(0, waterBottom - waterTop) / Math.max(0.001, bottom - top);
-    return { waterTop, waterBottom, ring, fade, filled, phase: this.phase, label: PHASES[this.phase] };
+    // 지금 움직이고 있는 수면. 차오를 때는 아래가, 빠질 때는 위가 내려간다.
+    // 글은 이 수면이 지나갈 때 지워진다
+    const front = this.phase === "drain" ? waterTop : waterBottom;
+    return { waterTop, waterBottom, front, ring, fade, filled, phase: this.phase, label: PHASES[this.phase] };
   }
 }
