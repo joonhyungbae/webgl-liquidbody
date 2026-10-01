@@ -36,7 +36,8 @@ export const PARAMS = [
   // 가벼운 노트북이면 3초 넘게 두는 편이 낫다. 모델이 한 장에 2초를 써도 작품은 안 끊긴다
   { key: "paintEvery", label: "덧칠 간격(초)", min: 0.5, max: 15, step: 0.1, value: 3.0 },
   // 모델이 원래 그림을 얼마나 바꾸나. 크면 전혀 다른 그림이 된다
-  { key: "paintStrength", label: "덧칠 세기", min: 0.1, max: 0.9, step: 0.02, value: 0.4 },
+  // 0.5 를 넘으면 모델이 관객의 몸 위에 없는 얼굴과 옷을 지어낸다. 낮게 두어 색과 결만 얻는다
+  { key: "paintStrength", label: "덧칠 세기", min: 0.1, max: 0.9, step: 0.02, value: 0.35 },
   { key: "mirror", label: "좌우 뒤집기", type: "check", value: true },
   { key: "text", label: "글 띄우기", type: "check", value: true },
 ];
@@ -64,14 +65,25 @@ export const ANSWER_HINT = "여기에 적으면 액체가 지워 갑니다";
 
 // ─── 덧칠 (paint.js) ─────────────────────────────────────────────────────
 // 단계마다 다른 말을 보낸다. 같은 몸이라도 결계일 때와 빠질 때가 다르게 칠해진다.
+//
+// 말은 영어로 적는다. 그림 모델이 영어로 배웠기 때문에 한국어로 적으면 거의 알아듣지 못한다.
 // 짧고 구체적인 말이 낫다. 긴 문장은 모델이 흘려듣는다.
+//
+// 얼굴을 그리지 말라고 매번 적어 둔다. 모델에 맡겨 두면 관객의 몸 위에 다른 사람의 얼굴을
+// 지어낸다. 이 작품에서는 덩어리로 남아야 한다.
 export const PROMPTS = {
-  idle: "어두운 방, 고요한 물의 결, 수묵, 아주 옅은 청색",
-  ring: "맑은 빛이 한 번 퍼진다, 수채화, 번진 경계, 청백색",
-  fill: "맑은 물이 몸 안으로 흘러든다, 수채화, 부드러운 경계, 일정한 청백색 톤",
-  hold: "물로 가득 찬 몸, 고요함, 수채화, 옅은 미색 빛",
-  drain: "물이 발밑으로 빠져나간다, 흐려지는 몸, 수채화, 차가운 청색",
-  done: "빈자리, 옅은 종이, 거의 흰색",
+  // 기다림. 아무도 없다
+  idle: "dark still water, ink wash, very pale blue, no face, abstract",
+  // 결계. 빛이 한 번 퍼진다
+  ring: "soft light spreading, watercolor, bleeding edges, pale blue white, no face, abstract shape",
+  // 차오름. 물이 몸으로 들어온다
+  fill: "clear water flowing into a body, watercolor, soft bleeding edges, pale blue white, no face, abstract figure",
+  // 머무름. 가득 찬 채로 있다
+  hold: "a body full of still water, calm, watercolor, pale warm white, no face, abstract figure",
+  // 빠짐. 발밑으로 빠져나간다
+  drain: "water draining away, fading body, watercolor, cold blue, no face, abstract figure",
+  // 끝. 빈자리
+  done: "empty pale paper, faint wash, almost white, no face",
 };
 
 // 모델에 보내는 그림의 가로 크기. 화면이 1920 이어도 이만큼 줄여서 보낸다.

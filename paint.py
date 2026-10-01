@@ -37,6 +37,7 @@ import argparse
 import http.server
 import io
 import json
+import math
 import sys
 import time
 from urllib.parse import parse_qs, urlparse
@@ -131,8 +132,9 @@ class Diffusion:
         w, h = img.size
         # 모델이 좋아하는 크기로 맞춘다. 8 의 배수가 아니면 거절한다
         img = img.resize((max(64, w // 8 * 8), max(64, h // 8 * 8)), Image.LANCZOS)
-        # 걸음 수는 세기에 맞춘다. steps × strength 가 1 보다 작으면 아무것도 칠해지지 않는다
-        steps = max(self.steps, int(1 / max(0.05, strength)) + 1)
+        # 걸음 수는 세기에 맞춘다. 모델이 실제로 밟는 걸음은 steps × strength 라서,
+        # 세기를 낮게 두면 걸음이 0 이 되어 아무것도 칠해지지 않는다. 늘 두 걸음은 밟게 한다
+        steps = max(self.steps, math.ceil(2 / max(0.05, strength)))
         out = self.pipe(
             prompt=prompt or "watercolor",
             image=img,
