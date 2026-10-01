@@ -8,11 +8,18 @@
 
   python3 paint.py                     시험용(stub). 모델 없이 색만 입혀 길이 뚫렸는지 본다
   python3 paint.py --backend diffusion 진짜 모델로. 아래 「모델 붙이기」를 먼저 읽는다
+  python3 paint.py --size 384          모델에 넣기 전에 이 가로로 줄인다. 가벼운 기계에서 낮춘다
   python3 paint.py --port 7010         포트를 바꾼다
 
 왜 매 프레임이 아니라 몇 초에 한 번인가
   이 작품은 느리다. 초당 몇 장이면 충분하고, 돌려받은 그림을 천천히 겹치면 모델이 프레임마다
   다르게 그리는 떨림이 보이지 않는다. 매 프레임 칠하면 물이 끓는 것처럼 보인다.
+
+가벼운 노트북에서
+  한 장에 2초가 걸려도 작품은 끊기지 않는다. 브라우저가 몇 초에 한 장만 받아 가기 때문이다.
+  느리면 덧칠 간격을 늘리고(조절판), --size 를 384 나 320 으로 줄이고, 한 걸음(step)짜리
+  작은 모델을 쓴다. SDXS-512 나 SD-Turbo 가 그런 모델이다. 큰 모델을 넣고 간격을 줄이는 것보다
+  작은 모델을 넉넉한 간격으로 쓰는 쪽이 이 작품에 맞는다.
 
 모델 붙이기
   맥(애플 실리콘)에서 실시간으로 도는 img2img 는 2026 년 기준으로 돌아간다.
@@ -30,6 +37,23 @@ import json
 import sys
 import time
 from urllib.parse import parse_qs, urlparse
+
+
+def shrink(png: bytes, width: int) -> bytes:
+    """모델에 넣기 전에 줄인다. 큰 그림은 모델을 몇 배로 느리게 만든다."""
+    if not width:
+        return png
+    try:
+        from PIL import Image
+    except ImportError:
+        return png
+    img = Image.open(io.BytesIO(png))
+    if img.width <= width:
+        return png
+    img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue()
 
 
 class Stub:
@@ -87,6 +111,7 @@ class Diffusion:
 
 class Handler(http.server.BaseHTTPRequestHandler):
     backend = None
+    size = 0          # 0 이 아니면 이 가로로 줄여서 모델에 넣는다
     busy = False
     stats = {"장": 0, "평균초": 0.0}
 
@@ -128,7 +153,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         Handler.busy = True
         t0 = time.time()
         try:
-            out = Handler.backend.paint(png, prompt, strength)
+            out = Handler.backend.paint(shrink(png, Handler.size), prompt, strength)
         except Exception as exc:
             print(f"칠하지 못했습니다: {exc}")
             self._send(500, b"", "text/plain")
@@ -151,9 +176,11 @@ def main() -> None:
     ap.add_argument("--backend", default="stub", choices=["stub", "diffusion"])
     ap.add_argument("--model", default="stabilityai/sd-turbo", help="그림 모델 이름")
     ap.add_argument("--steps", type=int, default=1)
+    ap.add_argument("--size", type=int, default=0, help="모델에 넣기 전 가로 크기. 0 이면 받은 그대로")
     ap.add_argument("--port", type=int, default=7010)
     args = ap.parse_args()
 
+    Handler.size = args.size
     Handler.backend = Stub() if args.backend == "stub" else Diffusion(model=args.model, steps=args.steps)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"그림 덧칠 서버를 켰습니다: 127.0.0.1:{args.port} ({Handler.backend.name})")

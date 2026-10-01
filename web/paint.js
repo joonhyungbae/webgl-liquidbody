@@ -11,7 +11,7 @@
  서버(paint.py)가 꺼져 있으면 한 번 물어보고 그만둔다. 덧칠이 없어도 작품은 그대로 돈다.
 */
 
-import { PROMPTS, PAINT_URL } from "./settings.js";
+import { PROMPTS, PAINT_URL, PAINT_SIZE } from "./settings.js";
 
 export class Paint {
   constructor() {
@@ -23,6 +23,9 @@ export class Paint {
     this.last = 0;
     this.note = "";
     this.count = 0;
+    this.small = document.createElement("canvas");   // 보낼 때 줄이는 자리
+    this.sctx = this.small.getContext("2d");
+    this.took = 0;                                   // 한 장에 걸린 시간(초)
   }
 
   prompt(phase) {
@@ -43,7 +46,16 @@ export class Paint {
 
   send(canvas, w, p) {
     this.busy = true;
-    canvas.toBlob(async (blob) => {
+    const t0 = performance.now();
+    // 화면 그대로 보내지 않는다. 1920 짜리 그림을 모델에 보내면 몇 배로 느려진다
+    const W = PAINT_SIZE;
+    const H = Math.round((W * canvas.height) / canvas.width);
+    if (this.small.width !== W || this.small.height !== H) {
+      this.small.width = W;
+      this.small.height = H;
+    }
+    this.sctx.drawImage(canvas, 0, 0, W, H);
+    this.small.toBlob(async (blob) => {
       if (!blob) { this.busy = false; return; }
       const q = new URLSearchParams({ prompt: this.prompt(w.phase), strength: String(p.paintStrength) });
       try {
@@ -59,14 +71,15 @@ export class Paint {
         setTimeout(() => URL.revokeObjectURL(out), 2000);
         this.have = true;
         this.count++;
-        this.note = `덧칠 ${this.count}장 · ${this.prompt(w.phase)}`;
+        this.took = (performance.now() - t0) / 1000;
+        this.note = `덧칠 ${this.count}장 · 한 장에 ${this.took.toFixed(1)}초 · ${this.prompt(w.phase)}`;
       } catch {
         this.off = true;
         this.note = "덧칠 꺼짐 (python paint.py 로 켭니다)";
       } finally {
         this.busy = false;
       }
-    }, "image/png");
+    }, "image/jpeg", 0.85);
   }
 
   /* 받은 그림을 원래 화면 위에 겹친다. 2D 그림판에 그린다 */

@@ -32,8 +32,9 @@ export const PARAMS = [
   { key: "paper", label: "종이결", min: 0, max: 1, step: 0.02, value: 0.35 },
   // 그림 모델로 덧칠하는 정도. 0 이면 덧칠하지 않는다 (paint.py 를 켜 두어야 한다)
   { key: "paintMix", label: "덧칠", min: 0, max: 1, step: 0.02, value: 0 },
-  // 몇 초에 한 장씩 받아 겹치나. 짧을수록 모델이 바쁘고 화면이 떨린다
-  { key: "paintEvery", label: "덧칠 간격(초)", min: 0.3, max: 10, step: 0.1, value: 2.0 },
+  // 몇 초에 한 장씩 받아 겹치나. 짧을수록 모델이 바쁘고 화면이 떨린다.
+  // 가벼운 노트북이면 3초 넘게 두는 편이 낫다. 모델이 한 장에 2초를 써도 작품은 안 끊긴다
+  { key: "paintEvery", label: "덧칠 간격(초)", min: 0.5, max: 15, step: 0.1, value: 3.0 },
   // 모델이 원래 그림을 얼마나 바꾸나. 크면 전혀 다른 그림이 된다
   { key: "paintStrength", label: "덧칠 세기", min: 0.1, max: 0.9, step: 0.02, value: 0.4 },
   { key: "mirror", label: "좌우 뒤집기", type: "check", value: true },
@@ -75,3 +76,8 @@ export const PROMPTS = {
 
 // 덧칠 서버 주소. python paint.py 가 여기에 뜬다
 export const PAINT_URL = "http://127.0.0.1:7010";
+
+// 모델에 보내는 그림의 가로 크기. 화면이 1920 이어도 이만큼 줄여서 보낸다.
+// 모델은 작은 그림을 훨씬 빨리 칠하고, 돌려받은 그림은 어차피 흐리게 겹치므로 티가 안 난다.
+// 가벼운 노트북이면 384 나 320 으로 줄인다.
+export const PAINT_SIZE = 448;

@@ -6,7 +6,10 @@
    ?display      조절판 없이 화면만 (전시용)
    ?video=...    카메라 대신 영상 파일로
    ?in=256       몸을 찾는 그림 크기(기본 384). 느린 기계에서 줄인다
+   ?light        가벼운 노트북용. 화면 해상도를 낮춘다 (./start.sh --light 가 쓴다)
    ?gpu          GPU 로 감지한다 (기본은 CPU)
+   ?clip=clips/물.mp4   액체 영상을 넣고 시작
+   ?paint=0.5    그림 모델 덧칠을 이만큼 켜고 시작 (./start.sh --paint 가 쓴다)
    ?offline=20   20초를 녹화해 서버에 보내고 끝낸다 (./start.sh --offline 20 이 쓴다)
 
  카메라 영상은 이 브라우저 안에서만 돌고 어디로도 보내지 않는다. 적은 글도 마찬가지다.
@@ -203,7 +206,8 @@ let fps = 60;
 
 function fit() {
   const r = canvas.getBoundingClientRect();
-  const dpr = Math.min(1.5, window.devicePixelRatio || 1);   // 셰이더가 무거워 화면 해상도를 조금 낮춘다
+  // 셰이더가 무거워 화면 해상도를 조금 낮춘다. ?light 면 더 낮춘다
+  const dpr = url.has("light") ? 1 : Math.min(1.5, window.devicePixelRatio || 1);
   const w = Math.max(320, Math.round(r.width * dpr));
   const h = Math.max(240, Math.round(r.height * dpr));
   if (canvas.width !== w || canvas.height !== h) {
@@ -266,6 +270,12 @@ function loop(now) {
 }
 
 /* ---------- 시작 ---------- */
+
+// ./start.sh --paint 가 ?paint=0.5 를 붙여 준다. 켜고도 안 보이면 켠 줄을 모른다
+if (url.has("paint")) {
+  p.paintMix = Math.max(0, Math.min(1, Number(url.get("paint")) || 0.5));
+  save();
+}
 
 buildPanel();
 if (url.has("display")) document.body.classList.add("display");
