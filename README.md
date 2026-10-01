@@ -54,6 +54,7 @@ conda 가 없으면 [Miniforge](https://conda-forge.org/download/)를 사용자 
 | `./start.sh --paint` | 그림 모델 덧칠까지 같이 켠다 |
 | `./start.sh --offline 20` | 20초를 녹화해 out 파일로 적고 끝낸다 |
 | `./start.sh --host 0.0.0.0` | 다른 컴퓨터에서 화면을 본다 |
+| `./start.sh --host 0.0.0.0 --https` | 다른 컴퓨터에서 그 기기의 카메라까지 쓴다 |
 | `./start.sh --port 7001` | 포트를 바꾼다 |
 
 카메라 대신 영상 파일로 보려면 화면 오른쪽 위의 「영상 파일 열기」를 고릅니다.
@@ -131,10 +132,20 @@ conda 가 없으면 [Miniforge](https://conda-forge.org/download/)를 사용자 
 조금씩 다르게 그리기 때문에, 매 프레임 바꾸면 물이 끓는 것처럼 떨립니다. 느린 기계에서도
 작품이 끊기지 않게 하려는 이유이기도 합니다.
 
-모델은 `paint.py` 의 `Diffusion.paint()` 한 자리에 붙입니다. 입력도 출력도 PNG 바이트라서
-무엇을 쓰든 나머지 코드는 그대로입니다. 맥에서 실시간으로 도는 img2img 는
-[StreamDiffusion-Mac](https://github.com/patrickhartono/StreamDiffusion-Mac) 과
-[StreamDiffusion-OSX](https://github.com/pvjosue/StreamDiffusion-OSX) 가 있습니다.
+`--backend diffusion` 은 img2img 모델을 올려 실제로 칠합니다. 처음 켤 때 모델을 받습니다
+(sd-turbo 약 2.5GB). 돌아가는 자리는 알아서 고릅니다. NVIDIA 면 cuda, 맥이면 mps 입니다.
+
+```bash
+pip install torch diffusers transformers accelerate
+python3 paint.py --backend diffusion --model IDKiro/sdxs-512-dreamshaper   # 더 작고 빠른 모델
+```
+
+더 빠르게 돌리고 싶으면 [StreamDiffusion-Mac](https://github.com/patrickhartono/StreamDiffusion-Mac) 이나
+[StreamDiffusion-OSX](https://github.com/pvjosue/StreamDiffusion-OSX) 를 `Diffusion.paint()` 안에 붙여도
+됩니다. 입력도 출력도 PNG 바이트라서 나머지 코드는 그대로입니다.
+
+관객이 찍힌 그림은 이 컴퓨터 안에서만 돕니다. 덧칠 요청은 브라우저가 보고 있는 주소로 가고,
+`serve.py` 가 같은 컴퓨터의 덧칠 서버로 넘깁니다. 바깥으로 나가지 않습니다.
 
 ## 8. 터치디자이너로 옮기기
 
@@ -154,6 +165,7 @@ conda 가 없으면 [Miniforge](https://conda-forge.org/download/)를 사용자 
 | 이런 일이 생기면 | 이렇게 합니다 |
 |---|---|
 | 카메라가 안 열린다 | 브라우저가 권한을 물었는지 봅니다. 맥은 시스템 설정에서 크롬에 카메라를 켭니다 |
+| 다른 기기에서 카메라가 안 열린다 | 브라우저는 localhost 가 아니면 https 에서만 카메라를 엽니다. `--https` 로 켜고, 경고가 뜨면 「고급」으로 지나갑니다 |
 | 몸을 못 잡는다 | 온몸이 화면에 들어오게 앉고, 뒤 배경과 옷의 밝기 차이를 둡니다 |
 | 덩어리가 떨린다 | `settings.js` 의 `MASK_SMOOTH` 를 낮춥니다. 0.2 쯤이면 느리지만 차분합니다 |
 | 느리다 | 주소 뒤에 `?in=256` 을 붙이고, 조절판의 「번짐」을 조금 내립니다 |

@@ -21,11 +21,14 @@
   작은 모델을 쓴다. SDXS-512 나 SD-Turbo 가 그런 모델이다. 큰 모델을 넣고 간격을 줄이는 것보다
   작은 모델을 넉넉한 간격으로 쓰는 쪽이 이 작품에 맞는다.
 
-모델 붙이기
-  맥(애플 실리콘)에서 실시간으로 도는 img2img 는 2026 년 기준으로 돌아간다.
-  https://github.com/patrickhartono/StreamDiffusion-Mac 또는 https://github.com/pvjosue/StreamDiffusion-OSX
-  를 같은 conda 환경에 깔고, 아래 Diffusion.paint() 안의 자리표시자를 그 호출로 바꾸면 된다.
-  입력은 PNG 바이트, 출력도 PNG 바이트다. 그 사이에서 무엇을 쓰든 나머지 코드는 그대로다.
+모델 깔기
+  pip install torch diffusers transformers accelerate
+  처음 켤 때 모델을 받는다(sd-turbo 는 약 2.5GB). 그다음부터는 받아 둔 것을 쓴다.
+  더 빠른 것을 원하면 --model IDKiro/sdxs-512-dreamshaper 처럼 작은 모델을 준다.
+
+  더 빠르게 돌리고 싶으면 StreamDiffusion 쪽을 붙여도 된다. 입력도 출력도 PNG 바이트라서
+  Diffusion.paint() 안만 바꾸면 나머지 코드는 그대로다.
+  https://github.com/patrickhartono/StreamDiffusion-Mac · https://github.com/pvjosue/StreamDiffusion-OSX
 """
 
 from __future__ import annotations
@@ -83,30 +86,64 @@ class Stub:
 
 
 class Diffusion:
-    """진짜 그림 모델. 여기에 StreamDiffusion 같은 것을 붙인다."""
+    """진짜 그림 모델. img2img 로 지금 화면을 다시 칠한다.
+
+    한 걸음짜리 작은 모델을 쓴다. 큰 모델은 한 장에 몇 초씩 걸려서, 느린 기계에서는
+    덧칠이 한참 뒤에 오고 그만큼 작품의 흐름과 어긋난다.
+
+    돌아가는 자리는 세 가지다. NVIDIA(cuda), 맥(mps), 그 밖(cpu). 알아서 고른다.
+    """
 
     name = "그림 모델"
 
-    def __init__(self, model: str = "", steps: int = 1, **_):
-        self.model = model
-        self.steps = steps
+    def __init__(self, model: str = "stabilityai/sd-turbo", steps: int = 2, **_):
+        self.steps = max(1, steps)
         self.pipe = None
-        # 여기에서 모델을 한 번만 올린다. 매번 올리면 첫 장이 몇 초씩 걸린다.
-        #
-        #   from streamdiffusion import StreamDiffusionWrapper
-        #   self.pipe = StreamDiffusionWrapper(model_id_or_path=model, mode="img2img",
-        #                                      t_index_list=[32], frame_buffer_size=1)
-        #
-        print("그림 모델 자리가 아직 비어 있습니다. paint.py 의 Diffusion.paint() 를 채우세요.")
+        try:
+            import torch
+            from diffusers import AutoPipelineForImage2Image
+        except ImportError:
+            print("torch 와 diffusers 가 없습니다. 시험용으로 켜거나 다음을 깝니다:")
+            print("  pip install torch diffusers transformers accelerate")
+            return
+
+        if torch.cuda.is_available():
+            device, dtype = "cuda", torch.float16
+        elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+            device, dtype = "mps", torch.float16
+        else:
+            device, dtype = "cpu", torch.float32
+        print(f"그림 모델을 올립니다: {model} ({device}). 처음에는 몇 분 걸립니다.")
+        self.pipe = AutoPipelineForImage2Image.from_pretrained(model, torch_dtype=dtype)
+        self.pipe = self.pipe.to(device)
+        self.pipe.set_progress_bar_config(disable=True)
+        if hasattr(self.pipe, "safety_checker"):
+            self.pipe.safety_checker = None      # 관객의 몸이 찍힌 그림을 바깥으로 보내지 않는다
+        self.name = f"그림 모델 {model} ({device})"
+        print("올렸습니다. 브라우저 쪽 조절판의 「덧칠」을 올리면 칠하기 시작합니다.")
 
     def paint(self, png: bytes, prompt: str, strength: float) -> bytes:
         if self.pipe is None:
             return png
-        #   from PIL import Image
-        #   img = Image.open(io.BytesIO(png)).convert("RGB")
-        #   out = self.pipe(image=img, prompt=prompt, strength=strength)
-        #   buf = io.BytesIO(); out.save(buf, format="PNG"); return buf.getvalue()
-        return png
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(png)).convert("RGB")
+        w, h = img.size
+        # 모델이 좋아하는 크기로 맞춘다. 8 의 배수가 아니면 거절한다
+        img = img.resize((max(64, w // 8 * 8), max(64, h // 8 * 8)), Image.LANCZOS)
+        # 걸음 수는 세기에 맞춘다. steps × strength 가 1 보다 작으면 아무것도 칠해지지 않는다
+        steps = max(self.steps, int(1 / max(0.05, strength)) + 1)
+        out = self.pipe(
+            prompt=prompt or "watercolor",
+            image=img,
+            num_inference_steps=steps,
+            strength=float(strength),
+            guidance_scale=0.0,     # turbo 계열은 0 으로 둔다. 올리면 느려지고 타 버린다
+        ).images[0]
+        out = out.resize((w, h), Image.LANCZOS)
+        buf = io.BytesIO()
+        out.save(buf, format="PNG")
+        return buf.getvalue()
 
 
 class Handler(http.server.BaseHTTPRequestHandler):

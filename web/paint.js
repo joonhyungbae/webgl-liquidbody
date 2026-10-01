@@ -9,9 +9,10 @@
  보이지 않고, 모델이 느린 기계에서도 작품이 끊기지 않는다.
 
  서버(paint.py)가 꺼져 있으면 한 번 물어보고 그만둔다. 덧칠이 없어도 작품은 그대로 돈다.
+ 보내는 곳은 지금 보고 있는 주소다. serve.py 가 덧칠 서버로 넘기므로 다른 기기에서 열어도 된다.
 */
 
-import { PROMPTS, PAINT_URL, PAINT_SIZE } from "./settings.js";
+import { PROMPTS, PAINT_SIZE } from "./settings.js";
 
 export class Paint {
   constructor() {
@@ -59,7 +60,8 @@ export class Paint {
       if (!blob) { this.busy = false; return; }
       const q = new URLSearchParams({ prompt: this.prompt(w.phase), strength: String(p.paintStrength) });
       try {
-        const res = await fetch(`${PAINT_URL}/paint?${q}`, { method: "POST", body: blob });
+        // 같은 주소로 부른다. serve.py 가 덧칠 서버로 넘겨 준다. 다른 기기에서 열어도 된다
+        const res = await fetch(`paint?${q}`, { method: "POST", body: blob });
         if (res.status === 429) { this.busy = false; return; }   // 아직 칠하는 중이면 건너뛴다
         if (!res.ok) throw new Error(res.status);
         const out = URL.createObjectURL(await res.blob());
