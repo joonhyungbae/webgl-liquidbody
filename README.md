@@ -87,7 +87,20 @@ conda 가 없으면 [Miniforge](https://conda-forge.org/download/)를 사용자 
 새벽빛과 미색 사이를 오갑니다. 톤을 하나로 묶어 두면 카메라가 본 옷 색이나 피부색이
 그림에 섞이지 않습니다.
 
-## 6. 안 될 때
+## 6. 터치디자이너로 옮기기
+
+전시를 터치디자이너로 돌릴 계획이면 브라우저 쪽은 값을 찾는 자리로 쓰고, 네트워크는 따로
+짭니다. 같은 그림이 나오게 하는 셰이더와 노드 순서를 적어 두었습니다.
+
+- [touchdesigner/liquidbody.glsl](touchdesigner/liquidbody.glsl) — GLSL TOP 에 그대로 붙여 넣는 픽셀 셰이더
+- [touchdesigner/네트워크-만드는-법.md](touchdesigner/네트워크-만드는-법.md) — 몸을 떼어내는 길(맥에서 쓸 수 있는 셋), 파라미터 이름, 액체를 움직이는 CHOP
+
+맥에서 사람을 떼어내는 일은 터치디자이너 안에서 됩니다.
+[MediaPipe TouchDesigner](https://github.com/torinmb/mediapipe-touchdesigner),
+[AppleVisionMask](https://github.com/aaronmylespereira/AppleVisionMask-TouchDesigner),
+[appletd](https://github.com/ojrgb/appletd) 중 하나를 쓰면 됩니다. 어느 것을 쓰든 다음 단계는 같습니다.
+
+## 7. 안 될 때
 
 | 이런 일이 생기면 | 이렇게 합니다 |
 |---|---|
@@ -98,7 +111,7 @@ conda 가 없으면 [Miniforge](https://conda-forge.org/download/)를 사용자 
 | 액체가 몸 밖으로 샌다 | 번짐이 너무 크면 마스크 밖까지 퍼집니다. 「번짐」을 내리거나 「결의 크기」를 올립니다 |
 | 화면이 검다 | WebGL2 가 없는 기계입니다. 크롬으로 열어 봅니다 |
 
-## 7. 더 들어가기
+## 8. 더 들어가기
 
 ```text
 serve.py            web/ 를 띄우고, --offline 녹화를 받아 파일로 적는다
@@ -111,6 +124,7 @@ web/
 ├── look.js         그 모두를 수채화로 그리는 셰이더
 ├── gl.js           셰이더를 올리고 돌리는 뒷일
 └── app.js          위의 것들을 한 프레임마다 잇는다
+touchdesigner/      같은 그림을 터치디자이너에서 만드는 법
 ```
 
 카메라 영상은 이 브라우저 안에서만 돕니다. 서버로도 파일로도 보내지 않습니다. 적은 글도

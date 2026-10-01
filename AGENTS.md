@@ -37,6 +37,7 @@ Cursor, Claude Code, Codex 등 어떤 도구로 들어왔든 이 파일을 먼�
 | `web/text.js` | 글 한 장을 그린다 | 글을 지우는 쪽은 셰이더다. 여기서 지우지 않는다 |
 | `web/gl.js` | WebGL 뒷일 | 그림의 성격을 여기에 넣지 않는다 |
 | `serve.py` | 파일 내주기, --offline 녹화 받기 | 외부 의존을 늘리지 않는다 |
+| `touchdesigner/` | 같은 그림을 터치디자이너에서 만드는 법 | `web/look.js` 를 고치면 여기 셰이더도 같이 고친다 |
 
 ## 깨뜨리면 안 되는 것
 
