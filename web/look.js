@@ -25,6 +25,7 @@ out vec4 outColor;
 
 uniform sampler2D uMask;     // 몸 마스크 (R)
 uniform sampler2D uText;     // 글자 한 장 (RGBA)
+uniform sampler2D uClip;     // 작가가 만든 액체 영상 (RGBA)
 uniform vec2  uRes;
 uniform float uTime;
 uniform float uBleed;        // 번짐
@@ -40,6 +41,7 @@ uniform float uFront;        // 지금 움직이고 있는 수면. 글은 이것
 uniform float uRing;         // 결계. 0~1 로 퍼진다. 0 이면 없음
 uniform float uMirror;       // 1 이면 좌우를 뒤집어 거울처럼 본다
 uniform float uFade;         // 전체 밝기. 들어오고 나갈 때 쓴다
+uniform float uClipMix;      // 액체를 영상으로 보일지. 0 이면 셰이더가 만든 액체만
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
@@ -113,10 +115,18 @@ void main() {
   float water = smoothstep(top - soft, top + soft, uv.y) * (1.0 - smoothstep(bot - soft, bot + soft, uv.y));
   water *= body;
 
-  col = mix(col, wet, water * (0.5 + 0.45 * inner));
+  // 액체의 색. 영상을 넣었으면 그 영상이 몸 안에서 액체가 된다
+  vec3 liquid = wet;
+  if (uClipMix > 0.001) {
+    vec3 clip = texture(uClip, vec2(uv.x, uv.y)).rgb;
+    // 영상의 색을 그대로 쓰지 않고 작품의 색 쪽으로 당긴다. 톤이 흐트러지지 않게 한다
+    vec3 toned = mix(vec3(dot(clip, vec3(0.299, 0.587, 0.114))) * wet * 1.35, clip, 0.45);
+    liquid = mix(wet, toned, uClipMix);
+  }
+  col = mix(col, liquid, water * (0.5 + 0.45 * inner));
   // 수면의 앞머리만 한 번 더 밝다. 물이 들어오는 자리가 보이게 한다
   float front = exp(-pow((uv.y - top) / (0.02 + uSurface * 0.02), 2.0)) * body;
-  col += wet * front * 0.5;
+  col += liquid * front * 0.5;
 
   // 별. 액체 안에서 더 밝다. 물에 섞여 도는 작은 빛이다
   vec2 grid = look * vec2(46.0, 34.0) + vec2(0.0, uTime * 0.22);

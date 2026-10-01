@@ -16,6 +16,7 @@ import { PARAMS, MASK_W, MASK_H } from "./settings.js";
 import { CameraSense, SimSense } from "./sense.js";
 import { Water } from "./water.js";
 import { Text } from "./text.js";
+import { Clip } from "./clip.js";
 import { FRAG } from "./look.js";
 import { make } from "./gl.js";
 
@@ -91,6 +92,21 @@ $("source").addEventListener("change", (e) => {
   else useSource(v);
 });
 $("file").addEventListener("change", (e) => e.target.files[0] && useSource("file", e.target.files[0]));
+
+/* ---------- 액체 영상 ---------- */
+
+const clip = new Clip();
+async function openClip(src) {
+  try {
+    const name = await clip.open(src);
+    $("cliphint").textContent = `액체 영상: ${name}. 몸 안에서만 보입니다. 조절판의 「액체 영상 섞기」로 양을 바꿉니다`;
+    $("clip").textContent = "액체 영상 바꾸기";
+  } catch (e) {
+    $("cliphint").textContent = `영상을 열지 못했습니다: ${e.message || e}`;
+  }
+}
+$("clip").addEventListener("click", () => $("clipfile").click());
+$("clipfile").addEventListener("change", (e) => e.target.files[0] && openClip(e.target.files[0]));
 
 /* ---------- 글 ---------- */
 
@@ -207,6 +223,8 @@ function loop(now) {
     const w = water.step(dt, f, p);
     fit();
     view.mask(f.mask, MASK_W, MASK_H);
+    const movie = clip.frame();
+    if (movie) view.clip(movie);
     if (text.draw(w, p)) view.text(text.canvas);
     view.draw({
       uRes: [canvas.width, canvas.height],
@@ -215,6 +233,7 @@ function loop(now) {
       uStars: p.stars, uWarm: p.warm, uPaper: p.paper,
       uWaterTop: w.waterTop, uWaterBottom: w.waterBottom, uFront: w.front,
       uRing: w.ring, uFade: w.fade, uMirror: p.mirror ? 1 : 0,
+      uClipMix: movie ? p.clipMix : 0,
     });
 
     if (!document.body.classList.contains("display")) {
@@ -237,6 +256,7 @@ function loop(now) {
 
 buildPanel();
 if (url.has("display")) document.body.classList.add("display");
+if (url.get("clip")) openClip(url.get("clip"));
 if (url.get("video")) {
   $("source").value = "file";
   useSource("file", url.get("video"));
@@ -271,4 +291,4 @@ if (offline > 0) {
   }, 1500);
 }
 
-window.liquidbody = { p, water, text, get sense() { return sense; } };
+window.liquidbody = { p, water, text, clip, get sense() { return sense; } };

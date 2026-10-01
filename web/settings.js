@@ -22,6 +22,8 @@ export const PARAMS = [
   { key: "drainSeconds", label: "빠지는 시간(초)", min: 2, max: 60, step: 1, value: 14 },
   // 액체의 앞머리가 일렁이는 폭
   { key: "surface", label: "수면의 일렁임", min: 0, max: 1, step: 0.02, value: 0.4 },
+  // 작가가 만든 액체 영상을 쓸지. 0 이면 셰이더가 만든 액체만 보인다
+  { key: "clipMix", label: "액체 영상 섞기", min: 0, max: 1, step: 0.02, value: 0.85 },
   // 별이 얼마나 많이 보이나
   { key: "stars", label: "별", min: 0, max: 1, step: 0.02, value: 0.5 },
   // 색의 온도. 0 이면 푸른 새벽, 1 이면 따뜻한 미색
