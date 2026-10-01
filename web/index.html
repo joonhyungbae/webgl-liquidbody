@@ -10,7 +10,7 @@
 <body>
 <div class="app">
   <div class="left">
-    <div id="stage"><canvas id="out"></canvas></div>
+    <div id="stage"><canvas id="out"></canvas><canvas id="over"></canvas></div>
     <div class="bar">
       <button id="restart">다시 처음부터</button>
       <button id="rec">녹화 시작</button>
@@ -52,6 +52,7 @@
         <button type="submit">띄우기</button>
       </form>
       <div class="hint">전시에서는 이 칸이 태블릿입니다. 적은 글은 이 브라우저에만 있고 어디로도 보내지 않습니다</div>
+      <div class="hint" id="painthint">덧칠은 꺼져 있습니다. python paint.py 를 켜고 조절판의 「덧칠」을 올리면 단계마다 다른 말로 다시 칠합니다</div>
     </div>
 
     <div class="card">

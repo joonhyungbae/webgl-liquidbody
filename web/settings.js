@@ -30,6 +30,12 @@ export const PARAMS = [
   { key: "warm", label: "색 (새벽 ↔ 미색)", min: 0, max: 1, step: 0.02, value: 0.3 },
   // 종이결. 화면이 매끈하지 않고 종이처럼 보이게 한다
   { key: "paper", label: "종이결", min: 0, max: 1, step: 0.02, value: 0.35 },
+  // 그림 모델로 덧칠하는 정도. 0 이면 덧칠하지 않는다 (paint.py 를 켜 두어야 한다)
+  { key: "paintMix", label: "덧칠", min: 0, max: 1, step: 0.02, value: 0 },
+  // 몇 초에 한 장씩 받아 겹치나. 짧을수록 모델이 바쁘고 화면이 떨린다
+  { key: "paintEvery", label: "덧칠 간격(초)", min: 0.3, max: 10, step: 0.1, value: 2.0 },
+  // 모델이 원래 그림을 얼마나 바꾸나. 크면 전혀 다른 그림이 된다
+  { key: "paintStrength", label: "덧칠 세기", min: 0.1, max: 0.9, step: 0.02, value: 0.4 },
   { key: "mirror", label: "좌우 뒤집기", type: "check", value: true },
   { key: "text", label: "글 띄우기", type: "check", value: true },
 ];
@@ -54,3 +60,18 @@ export const LINES = [
 ];
 export const LINE_SECONDS = 5.5;   // 한 줄이 떠 있는 시간
 export const ANSWER_HINT = "여기에 적으면 액체가 지워 갑니다";
+
+// ─── 덧칠 (paint.js) ─────────────────────────────────────────────────────
+// 단계마다 다른 말을 보낸다. 같은 몸이라도 결계일 때와 빠질 때가 다르게 칠해진다.
+// 짧고 구체적인 말이 낫다. 긴 문장은 모델이 흘려듣는다.
+export const PROMPTS = {
+  idle: "어두운 방, 고요한 물의 결, 수묵, 아주 옅은 청색",
+  ring: "맑은 빛이 한 번 퍼진다, 수채화, 번진 경계, 청백색",
+  fill: "맑은 물이 몸 안으로 흘러든다, 수채화, 부드러운 경계, 일정한 청백색 톤",
+  hold: "물로 가득 찬 몸, 고요함, 수채화, 옅은 미색 빛",
+  drain: "물이 발밑으로 빠져나간다, 흐려지는 몸, 수채화, 차가운 청색",
+  done: "빈자리, 옅은 종이, 거의 흰색",
+};
+
+// 덧칠 서버 주소. python paint.py 가 여기에 뜬다
+export const PAINT_URL = "http://127.0.0.1:7010";

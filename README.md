@@ -98,7 +98,29 @@ conda 가 없으면 [Miniforge](https://conda-forge.org/download/)를 사용자 
 조절판의 「액체 영상 섞기」로 영상과 셰이더가 만든 액체 사이를 오갑니다. 0 이면 영상을
 쓰지 않고, 1 이면 영상만 씁니다. 중간에 두면 영상의 흐름에 작품의 색이 입혀집니다.
 
-## 7. 터치디자이너로 옮기기
+## 7. 그림 모델로 덧칠하기
+
+단계마다 다른 말을 보내서 화면을 다시 칠할 수 있습니다. 결계일 때와 차오를 때와 빠질 때의
+말이 다르고, 같은 몸이라도 단계마다 다르게 칠해집니다. 보내는 말은 `web/settings.js` 의
+`PROMPTS` 에 있습니다.
+
+```bash
+python3 paint.py              # 시험용. 모델 없이 길이 뚫렸는지 본다
+python3 paint.py --backend diffusion
+```
+
+서버를 켜고 조절판의 **덧칠** 을 올리면 시작합니다. 꺼 두면 아무 일도 일어나지 않습니다.
+
+매 프레임 칠하지 않습니다. 몇 초에 한 장만 받아 1초에 걸쳐 겹칩니다. 모델은 프레임마다
+조금씩 다르게 그리기 때문에, 매 프레임 바꾸면 물이 끓는 것처럼 떨립니다. 느린 기계에서도
+작품이 끊기지 않게 하려는 이유이기도 합니다.
+
+모델은 `paint.py` 의 `Diffusion.paint()` 한 자리에 붙입니다. 입력도 출력도 PNG 바이트라서
+무엇을 쓰든 나머지 코드는 그대로입니다. 맥에서 실시간으로 도는 img2img 는
+[StreamDiffusion-Mac](https://github.com/patrickhartono/StreamDiffusion-Mac) 과
+[StreamDiffusion-OSX](https://github.com/pvjosue/StreamDiffusion-OSX) 가 있습니다.
+
+## 8. 터치디자이너로 옮기기
 
 전시를 터치디자이너로 돌릴 계획이면 브라우저 쪽은 값을 찾는 자리로 쓰고, 네트워크는 따로
 짭니다. 같은 그림이 나오게 하는 셰이더와 노드 순서를 적어 두었습니다.
@@ -111,7 +133,7 @@ conda 가 없으면 [Miniforge](https://conda-forge.org/download/)를 사용자 
 [AppleVisionMask](https://github.com/aaronmylespereira/AppleVisionMask-TouchDesigner),
 [appletd](https://github.com/ojrgb/appletd) 중 하나를 쓰면 됩니다. 어느 것을 쓰든 다음 단계는 같습니다.
 
-## 8. 안 될 때
+## 9. 안 될 때
 
 | 이런 일이 생기면 | 이렇게 합니다 |
 |---|---|
@@ -121,18 +143,22 @@ conda 가 없으면 [Miniforge](https://conda-forge.org/download/)를 사용자 
 | 느리다 | 주소 뒤에 `?in=256` 을 붙이고, 조절판의 「번짐」을 조금 내립니다 |
 | 액체가 몸 밖으로 샌다 | 번짐이 너무 크면 마스크 밖까지 퍼집니다. 「번짐」을 내리거나 「결의 크기」를 올립니다 |
 | 화면이 검다 | WebGL2 가 없는 기계입니다. 크롬으로 열어 봅니다 |
+| 덧칠이 떨린다 | 「덧칠 간격」을 늘리고 「덧칠 세기」를 내립니다. 0.3 아래면 원래 그림이 거의 그대로 남습니다 |
+| 덧칠이 안 된다 | python3 paint.py 를 켰는지, 조절판의 「덧칠」이 0 이 아닌지 봅니다 |
 
-## 9. 더 들어가기
+## 10. 더 들어가기
 
 ```text
 serve.py            web/ 를 띄우고, --offline 녹화를 받아 파일로 적는다
 fetch_model.py      몸을 찾는 모델을 받는다
+paint.py            화면을 받아 그림 모델로 다시 칠해 돌려준다 (선택)
 web/
 ├── settings.js     만지는 숫자
 ├── sense.js        카메라에서 몸을 한 덩어리로 떼어낸다 (MediaPipe)
 ├── water.js        액체가 차고 빠지는 시간의 규칙
 ├── text.js         질문과 답을 한 장의 글로 그린다
 ├── clip.js         작가가 만든 액체 영상을 몸 안에 넣는다
+├── paint.js        단계마다 다른 말로 덧칠한 그림을 받아 겹친다
 ├── look.js         그 모두를 수채화로 그리는 셰이더
 ├── gl.js           셰이더를 올리고 돌리는 뒷일
 └── app.js          위의 것들을 한 프레임마다 잇는다

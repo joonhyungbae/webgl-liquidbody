@@ -17,6 +17,7 @@ import { CameraSense, SimSense } from "./sense.js";
 import { Water } from "./water.js";
 import { Text } from "./text.js";
 import { Clip } from "./clip.js";
+import { Paint } from "./paint.js";
 import { FRAG } from "./look.js";
 import { make } from "./gl.js";
 
@@ -185,6 +186,9 @@ document.addEventListener("visibilitychange", () => document.visibilityState ===
 /* ---------- 한 프레임 ---------- */
 
 const canvas = $("out");
+const over = $("over");
+const octx = over.getContext("2d");
+const paint = new Paint();
 const water = new Water();
 let view = null;
 try {
@@ -205,6 +209,10 @@ function fit() {
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
+  }
+  if (over.width !== w || over.height !== h) {
+    over.width = w;
+    over.height = h;
   }
 }
 
@@ -236,6 +244,10 @@ function loop(now) {
       uClipMix: movie ? p.clipMix : 0,
     });
 
+    // 그림 모델이 다시 칠한 그림을 그 위에 천천히 겹친다
+    paint.step(dt, canvas, w, p);
+    paint.drawTo(octx, over.width, over.height, p);
+
     if (!document.body.classList.contains("display")) {
       pctx.save();
       if (p.mirror) { pctx.translate(prev.width, 0); pctx.scale(-1, 1); }
@@ -247,6 +259,7 @@ function loop(now) {
       meter("filled", w.filled, w.filled.toFixed(2));
       $("phase").textContent = w.label;
       $("fps").textContent = `${Math.round(fps)} fps`;
+      if (paint.note) $("painthint").textContent = paint.note;
     }
   }
   requestAnimationFrame(loop);
@@ -291,4 +304,4 @@ if (offline > 0) {
   }, 1500);
 }
 
-window.liquidbody = { p, water, text, clip, get sense() { return sense; } };
+window.liquidbody = { p, water, text, clip, paint, get sense() { return sense; } };
