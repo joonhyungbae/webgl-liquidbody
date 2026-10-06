@@ -29,7 +29,9 @@ import argparse
 import http.server
 import io
 import json
+import queue
 import sys
+import threading
 import time
 from urllib.parse import parse_qs, urlparse
 
@@ -117,10 +119,45 @@ class StreamBackend:
         return buf.getvalue()
 
 
+class Worker:
+    """모델 계산은 늘 같은 스레드 하나에서 한다.
+
+    웹 서버는 요청마다 새 스레드를 만든다. 그 스레드에서 모델을 부르면 PyTorch 가 스레드마다
+    그래픽 칩의 준비물(cuBLAS 핸들 등)을 새로 만들어, 35ms 걸릴 한 장이 120ms 넘게 걸린다
+    (4090 에서 잰 값). 그래서 요청은 일감만 넘기고 이 스레드가 칠한 것을 받아 간다.
+
+    칠하는 한 장 말고 기다리는 자리를 하나 둔다. 브라우저가 두 장을 겹쳐 보내면, 한 장이
+    오가는 동안 다른 한 장을 칠하고 있어 왕복 시간이 숨는다.
+    """
+
+    def __init__(self, backend) -> None:
+        self.backend = backend
+        self.jobs: queue.Queue = queue.Queue(maxsize=1)
+        threading.Thread(target=self.run, daemon=True).start()
+
+    def run(self) -> None:
+        while True:
+            args, box, done = self.jobs.get()
+            try:
+                box.append(self.backend.paint(*args))
+            except Exception as exc:     # 한 장이 실패해도 서버는 계속 돈다
+                box.append(exc)
+            done.set()
+
+    def paint(self, png: bytes, prompt: str, strength: float) -> bytes:
+        box: list = []
+        done = threading.Event()
+        self.jobs.put_nowait(((png, prompt, strength), box, done))   # 차 있으면 queue.Full
+        done.wait()
+        if isinstance(box[0], Exception):
+            raise box[0]
+        return box[0]
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     backend = None
     size = 0          # 0 이 아니면 이 가로로 줄여서 모델에 넣는다
-    busy = False
+    worker = None
     stats = {"장": 0, "평균초": 0.0}
 
     def _send(self, code: int, body: bytes, kind: str) -> None:
@@ -151,30 +188,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if url.path != "/paint":
             self.send_error(404)
             return
-        # 한 장을 칠하는 동안 다음 장이 들어오면 흘린다. 줄을 세우면 점점 늦어진다.
-        # 브라우저는 한 번에 한 장만 보내지만, 창을 두 개 열면 겹칠 수 있다
-        if Handler.busy:
-            self._send(429, b"busy", "text/plain")
-            return
         q = parse_qs(url.query)
         prompt = q.get("prompt", [""])[0]
         strength = float(q.get("strength", ["0.4"])[0])
         png = self.rfile.read(int(self.headers.get("Content-Length", 0)))
-        Handler.busy = True
         t0 = time.time()
         try:
-            out = Handler.backend.paint(shrink(png, Handler.size), prompt, strength)
+            out = Handler.worker.paint(shrink(png, Handler.size), prompt, strength)
+        except queue.Full:
+            # 칠하는 한 장과 기다리는 한 장이 이미 있으면 흘린다. 줄을 세우면 점점 늦어진다
+            self._send(429, b"busy", "text/plain")
+            return
         except Exception as exc:
             print(f"칠하지 못했습니다: {exc}")
             self._send(500, b"", "text/plain")
             return
-        finally:
-            Handler.busy = False
         took = time.time() - t0
         n = Handler.stats["장"] + 1
         Handler.stats["장"] = n
         Handler.stats["평균초"] = round(Handler.stats["평균초"] + (took - Handler.stats["평균초"]) / n, 3)
-        self._send(200, out, "image/png")
+        self._send(200, out, "image/jpeg" if out[:2] == b"\xff\xd8" else "image/png")
 
     def log_message(self, *args) -> None:
         pass
@@ -196,6 +229,7 @@ def main() -> None:
         Handler.backend = Stub()
     else:
         Handler.backend = StreamBackend(model=args.model, steps=args.steps, similar=args.similar)
+    Handler.worker = Worker(Handler.backend)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"그림 덧칠 서버를 켰습니다: 127.0.0.1:{args.port} ({Handler.backend.name})")
     print("브라우저 쪽에서 조절판의 「덧칠」을 올리면 칠하기 시작합니다. 끝내려면 Ctrl+C")

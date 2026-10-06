@@ -94,3 +94,7 @@ export const PROMPTS = {
 // 초당 장 수가 모자라면 384 나 320 으로 줄인다. 512 를 넘기면 sd-turbo 가 배운 크기를 넘어
 // 그림이 오히려 흐트러진다.
 export const PAINT_SIZE = 448;
+
+// 한 번에 몇 장까지 보내 놓고 기다리나. 2 면 한 장이 오가는 동안 서버가 다른 한 장을 칠한다.
+// 1 로 두면 왕복 시간이 장마다 그대로 더해진다. 서버(paint.py)는 칠하는 한 장과 기다리는 한 장만 받는다
+export const PAINT_FLYING = 2;

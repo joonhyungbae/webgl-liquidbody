@@ -18,7 +18,7 @@
  보내는 곳은 지금 보고 있는 주소다. serve.py 가 덧칠 서버로 넘기므로 다른 기기에서 열어도 된다.
 */
 
-import { PROMPTS, PAINT_SIZE } from "./settings.js";
+import { PROMPTS, PAINT_SIZE, PAINT_FLYING } from "./settings.js";
 
 export class Paint {
   constructor() {
@@ -27,7 +27,7 @@ export class Paint {
     this.have = false;
     this.mix = 0;                    // 덧칠이 드러난 정도. 처음 받은 뒤 1초에 걸쳐 오른다
     this.retryAt = 0;                // 서버가 없으면 이때까지 묻지 않는다
-    this.busy = false;
+    this.flying = 0;                 // 보내 놓고 아직 못 받은 장 수
     this.note = "";
     this.count = 0;
     this.small = document.createElement("canvas");   // 보낼 때 줄이는 자리
@@ -36,6 +36,8 @@ export class Paint {
     this.actx = this.acc.getContext("2d");
     this.took = 0;                                   // 보내고 받기까지 걸린 시간(초)
     this.rate = 0;                                   // 초당 받은 장 수
+    this.arrived = 0;                                // 마지막으로 받은 때
+    this.gap = 0;                                    // 받는 간격(초), 평균
     this.server = null;                              // 서버가 알려 준 상태
     this.lastHealth = 0;
   }
@@ -55,9 +57,10 @@ export class Paint {
     }
   }
 
-  /* 지금 한 장을 보낼 때인가. 앞 장이 돌아왔으면 바로 다음 장을 보낸다 */
+  /* 지금 한 장을 보낼 때인가. 두 장까지 겹쳐 보낸다. 한 장이 오가는 동안 서버는 다른 한 장을
+     칠하고 있어서, 다른 기기에서 열어 왕복이 길어도 그만큼 느려지지 않는다 */
   wants(p) {
-    return p.paintMix > 0 && !this.busy && performance.now() >= this.retryAt;
+    return p.paintMix > 0 && this.flying < PAINT_FLYING && !this.sending && performance.now() >= this.retryAt;
   }
 
   /* 덧칠이 화면에 드러나는 정도. 셰이더의 uPaintMix 로 간다 */
@@ -66,7 +69,8 @@ export class Paint {
   }
 
   send(canvas, w, p) {
-    this.busy = true;
+    this.flying++;
+    this.sending = true;                 // 그림을 묶는 동안에는 다음 장을 뜨지 않는다
     const t0 = performance.now();
     // 화면 그대로 보내지 않는다. 1920 짜리 그림을 모델에 보내면 몇 배로 느려진다
     const W = PAINT_SIZE;
@@ -77,7 +81,8 @@ export class Paint {
     }
     this.sctx.drawImage(canvas, 0, 0, W, H);
     this.small.toBlob(async (blob) => {
-      if (!blob) { this.busy = false; return; }
+      this.sending = false;
+      if (!blob) { this.flying--; return; }
       const q = new URLSearchParams({ prompt: this.prompt(w.phase), strength: String(p.paintStrength) });
       try {
         // 같은 주소로 부른다. serve.py 가 덧칠 서버로 넘겨 준다. 다른 기기에서 열어도 된다
@@ -91,16 +96,23 @@ export class Paint {
         this.count++;
         const took = (performance.now() - t0) / 1000;
         this.took = this.count === 1 ? took : this.took * 0.9 + took * 0.1;
-        this.rate = 1 / Math.max(0.001, this.took);
+        // 두 장을 겹쳐 보내므로 초당 장 수는 왕복 시간이 아니라 받는 간격으로 잰다
+        const now = performance.now();
+        if (this.arrived) {
+          const gap = (now - this.arrived) / 1000;
+          this.gap = this.gap ? this.gap * 0.9 + gap * 0.1 : gap;
+          this.rate = 1 / Math.max(0.001, this.gap);
+        }
+        this.arrived = now;
         const s = this.server;
         const skip = s && s["칠한장"] ? ` · 가만히 있어 건너뜀 ${s["건너뜀"]}` : "";
         const gpu = s && s["한장초"] ? ` · 모델 ${Math.round(s["한장초"] * 1000)}ms` : "";
-        this.note = `덧칠 초당 ${this.rate.toFixed(1)}장${gpu}${skip} · ${this.prompt(w.phase)}`;
+        this.note = `덧칠 초당 ${this.rate.toFixed(1)}장 · 왕복 ${Math.round(this.took * 1000)}ms${gpu}${skip} · ${this.prompt(w.phase)}`;
       } catch {
         this.retryAt = performance.now() + 5000;
         this.note = "덧칠 서버를 기다립니다. 처음 켤 때는 모델을 올리느라 몇 분 걸립니다 (python paint.py)";
       } finally {
-        this.busy = false;
+        this.flying--;
       }
     }, "image/jpeg", 0.85);
   }
