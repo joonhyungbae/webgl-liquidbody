@@ -6,8 +6,8 @@
 #   ./start.sh --sim           카메라 없이 가짜 사람으로
 #   ./start.sh --display       조절판 없이 화면만 (전시용)
 #   ./start.sh --light         가벼운 노트북용. 감지 그림과 화면 해상도를 낮춘다
-#   ./start.sh --paint         그림 모델 덧칠까지 같이 켠다 (시험용 백엔드)
-#   ./start.sh --paint diffusion   진짜 그림 모델로 덧칠한다
+#   ./start.sh --paint         그림 모델 덧칠까지 같이 켠다 (StreamDiffusion 방식)
+#   ./start.sh --paint stub    모델 없이 덧칠 길만 시험한다
 #   ./start.sh --offline 20    장비 없이 20초를 out.mp4 로 적는다
 #   ./start.sh --host 0.0.0.0  다른 컴퓨터에서 본다
 #   ./start.sh --port 7001     포트를 바꾼다
@@ -33,8 +33,8 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --light) LIGHT="1" ;;
     --paint)
-      PAINT="stub"
-      case "${2:-}" in stub|diffusion) PAINT="$2"; shift ;; esac
+      PAINT="stream"
+      case "${2:-}" in stub|stream) PAINT="$2"; shift ;; esac
       ;;
     *) ARGS+=("$1") ;;
   esac
@@ -49,8 +49,8 @@ fi
 
 if [ -n "$PAINT" ]; then
   echo "▸ 그림 덧칠 서버를 켭니다 ($PAINT)"
-  # 가벼운 기계에서는 모델에 넣는 그림도 줄인다
-  py paint.py --backend "$PAINT" --size $([ -n "$LIGHT" ] && echo 320 || echo 448) &
+  # 가벼운 기계에서는 모델에 넣는 그림을 줄이고 한 걸음으로 칠한다
+  py paint.py --backend "$PAINT" $([ -n "$LIGHT" ] && echo "--size 320 --steps 1" || echo "--size 448") &
   PAINT_PID=$!
   trap 'kill $PAINT_PID 2>/dev/null || true' EXIT
   sleep 1

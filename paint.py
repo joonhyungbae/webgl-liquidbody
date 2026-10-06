@@ -1,34 +1,26 @@
 #!/usr/bin/env python3
 """
-그림 덧칠 서버. 화면 한 장을 받아 그림 모델로 다시 칠해서 돌려준다.
+그림 덧칠 서버. 화면을 받아 그림 모델로 다시 칠해서 돌려준다.
 
-브라우저가 몇 초에 한 번 지금 화면을 보내면, 여기서 모델이 칠한 그림을 돌려주고,
-브라우저가 그것을 원래 화면 위에 천천히 겹친다. 모델이 없거나 느려도 작품은 그대로 돈다.
-켜지 않으면 브라우저는 한 번 물어보고 그만둔다.
+브라우저는 한 장을 돌려받자마자 다음 장을 보낸다. 모델이 빠른 만큼 화면이 따라 바뀐다.
+모델이 없거나 꺼져 있어도 작품은 그대로 돈다. 브라우저가 한 번 물어보고 그만둔다.
 
-  python3 paint.py                     시험용(stub). 모델 없이 색만 입혀 길이 뚫렸는지 본다
-  python3 paint.py --backend diffusion 진짜 모델로. 아래 「모델 붙이기」를 먼저 읽는다
-  python3 paint.py --size 384          모델에 넣기 전에 이 가로로 줄인다. 가벼운 기계에서 낮춘다
+  python3 paint.py                     StreamDiffusion 방식으로 (stream.py). 기본
+  python3 paint.py --backend stub      시험용. 모델 없이 색만 입혀 길이 뚫렸는지 본다
+  python3 paint.py --steps 1           한 걸음으로. 더 빠르고 덜 칠한다. 가벼운 기계에서
+  python3 paint.py --size 384          모델에 넣기 전에 이 가로로 줄인다
+  python3 paint.py --similar 0.98      가만히 있을 때 건너뛰는 정도. 1 이면 건너뛰지 않는다
   python3 paint.py --port 7010         포트를 바꾼다
 
-왜 매 프레임이 아니라 몇 초에 한 번인가
-  이 작품은 느리다. 초당 몇 장이면 충분하고, 돌려받은 그림을 천천히 겹치면 모델이 프레임마다
-  다르게 그리는 떨림이 보이지 않는다. 매 프레임 칠하면 물이 끓는 것처럼 보인다.
-
-가벼운 노트북에서
-  한 장에 2초가 걸려도 작품은 끊기지 않는다. 브라우저가 몇 초에 한 장만 받아 가기 때문이다.
-  느리면 덧칠 간격을 늘리고(조절판), --size 를 384 나 320 으로 줄이고, 한 걸음(step)짜리
-  작은 모델을 쓴다. SDXS-512 나 SD-Turbo 가 그런 모델이다. 큰 모델을 넣고 간격을 줄이는 것보다
-  작은 모델을 넉넉한 간격으로 쓰는 쪽이 이 작품에 맞는다.
+왜 StreamDiffusion 방식인가
+  보통의 img2img 는 한 장마다 모델을 처음부터 다시 준비해서, 매 프레임 돌리면 느리고 떨린다.
+  StreamDiffusion 은 노이즈를 고정하고 걸음을 한 줄로 세워, 같은 기계에서 몇 배 빠르게, 덜
+  떨리게 칠한다. 자세한 것은 stream.py 맨 위에 있다.
 
 모델 깔기
   pip install torch diffusers transformers accelerate
-  처음 켤 때 모델을 받는다(sd-turbo 는 약 2.5GB). 그다음부터는 받아 둔 것을 쓴다.
-  더 빠른 것을 원하면 --model IDKiro/sdxs-512-dreamshaper 처럼 작은 모델을 준다.
-
-  더 빠르게 돌리고 싶으면 StreamDiffusion 쪽을 붙여도 된다. 입력도 출력도 PNG 바이트라서
-  Diffusion.paint() 안만 바꾸면 나머지 코드는 그대로다.
-  https://github.com/patrickhartono/StreamDiffusion-Mac · https://github.com/pvjosue/StreamDiffusion-OSX
+  처음 켤 때 모델을 받는다(sd-turbo 약 2.5GB, TAESD 약 10MB). 그다음부터는 받아 둔 것을 쓴다.
+  돌아가는 자리는 알아서 고른다. NVIDIA 면 cuda, 맥이면 mps 다.
 """
 
 from __future__ import annotations
@@ -37,7 +29,6 @@ import argparse
 import http.server
 import io
 import json
-import math
 import sys
 import time
 from urllib.parse import parse_qs, urlparse
@@ -65,6 +56,9 @@ class Stub:
 
     name = "시험용(stub)"
 
+    def stats(self) -> dict:
+        return {}
+
     def __init__(self, **_):
         try:
             from PIL import Image, ImageFilter  # noqa: F401
@@ -86,65 +80,40 @@ class Stub:
         return out.getvalue()
 
 
-class Diffusion:
-    """진짜 그림 모델. img2img 로 지금 화면을 다시 칠한다.
+class StreamBackend:
+    """StreamDiffusion 방식. stream.py 를 부른다. 깔린 것이 없으면 시험용처럼 받은 그림을 돌려준다."""
 
-    한 걸음짜리 작은 모델을 쓴다. 큰 모델은 한 장에 몇 초씩 걸려서, 느린 기계에서는
-    덧칠이 한참 뒤에 오고 그만큼 작품의 흐름과 어긋난다.
-
-    돌아가는 자리는 세 가지다. NVIDIA(cuda), 맥(mps), 그 밖(cpu). 알아서 고른다.
-    """
-
-    name = "그림 모델"
-
-    def __init__(self, model: str = "stabilityai/sd-turbo", steps: int = 2, **_):
-        self.steps = max(1, steps)
-        self.pipe = None
+    def __init__(self, model: str, steps: int, similar: float, **_):
+        self.stream = None
+        self.name = "StreamDiffusion 방식 (모델 없음)"
         try:
-            import torch
-            from diffusers import AutoPipelineForImage2Image
+            from stream import Stream
         except ImportError:
-            print("torch 와 diffusers 가 없습니다. 시험용으로 켜거나 다음을 깝니다:")
+            print("torch 와 diffusers 가 없습니다. 다음을 깔거나 --backend stub 으로 켭니다:")
             print("  pip install torch diffusers transformers accelerate")
             return
-
-        if torch.cuda.is_available():
-            device, dtype = "cuda", torch.float16
-        elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-            device, dtype = "mps", torch.float16
-        else:
-            device, dtype = "cpu", torch.float32
-        print(f"그림 모델을 올립니다: {model} ({device}). 처음에는 몇 분 걸립니다.")
-        self.pipe = AutoPipelineForImage2Image.from_pretrained(model, torch_dtype=dtype)
-        self.pipe = self.pipe.to(device)
-        self.pipe.set_progress_bar_config(disable=True)
-        if hasattr(self.pipe, "safety_checker"):
-            self.pipe.safety_checker = None      # 관객의 몸이 찍힌 그림을 바깥으로 보내지 않는다
-        self.name = f"그림 모델 {model} ({device})"
+        print(f"그림 모델을 올립니다: {model}. 처음에는 몇 분 걸립니다.")
+        self.stream = Stream(model=model, steps=steps, similar=similar)
+        self.name = self.stream.name
         print("올렸습니다. 브라우저 쪽 조절판의 「덧칠」을 올리면 칠하기 시작합니다.")
 
+    def stats(self) -> dict:
+        s = self.stream
+        if not s:
+            return {}
+        return {"한장초": round(s.took, 3), "칠한장": s.frames, "건너뜀": s.skips}
+
     def paint(self, png: bytes, prompt: str, strength: float) -> bytes:
-        if self.pipe is None:
+        if self.stream is None:
             return png
         from PIL import Image
 
         img = Image.open(io.BytesIO(png)).convert("RGB")
-        w, h = img.size
-        # 모델이 좋아하는 크기로 맞춘다. 8 의 배수가 아니면 거절한다
-        img = img.resize((max(64, w // 8 * 8), max(64, h // 8 * 8)), Image.LANCZOS)
-        # 걸음 수는 세기에 맞춘다. 모델이 실제로 밟는 걸음은 steps × strength 라서,
-        # 세기를 낮게 두면 걸음이 0 이 되어 아무것도 칠해지지 않는다. 늘 두 걸음은 밟게 한다
-        steps = max(self.steps, math.ceil(2 / max(0.05, strength)))
-        out = self.pipe(
-            prompt=prompt or "watercolor",
-            image=img,
-            num_inference_steps=steps,
-            strength=float(strength),
-            guidance_scale=0.0,     # turbo 계열은 0 으로 둔다. 올리면 느려지고 타 버린다
-        ).images[0]
-        out = out.resize((w, h), Image.LANCZOS)
+        out = self.stream(img, prompt or "watercolor", strength)
+        if out.size != img.size:
+            out = out.resize(img.size, Image.BILINEAR)
         buf = io.BytesIO()
-        out.save(buf, format="PNG")
+        out.save(buf, format="JPEG", quality=90)   # PNG 보다 몇 배 빨리 묶고 푼다
         return buf.getvalue()
 
 
@@ -171,7 +140,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if urlparse(self.path).path == "/health":
-            body = json.dumps({"backend": Handler.backend.name, **Handler.stats}, ensure_ascii=False).encode()
+            body = json.dumps({"backend": Handler.backend.name, **Handler.stats, **Handler.backend.stats()},
+                              ensure_ascii=False).encode()
             self._send(200, body, "application/json; charset=utf-8")
             return
         self.send_error(404)
@@ -181,7 +151,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if url.path != "/paint":
             self.send_error(404)
             return
-        # 한 장을 칠하는 동안 다음 장이 들어오면 흘린다. 줄을 세우면 점점 늦어진다
+        # 한 장을 칠하는 동안 다음 장이 들어오면 흘린다. 줄을 세우면 점점 늦어진다.
+        # 브라우저는 한 번에 한 장만 보내지만, 창을 두 개 열면 겹칠 수 있다
         if Handler.busy:
             self._send(429, b"busy", "text/plain")
             return
@@ -212,15 +183,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
 def main() -> None:
     sys.stdout.reconfigure(line_buffering=True)
     ap = argparse.ArgumentParser(description="화면을 받아 다시 칠해 돌려준다")
-    ap.add_argument("--backend", default="stub", choices=["stub", "diffusion"])
+    ap.add_argument("--backend", default="stream", choices=["stream", "stub"])
     ap.add_argument("--model", default="stabilityai/sd-turbo", help="그림 모델 이름")
-    ap.add_argument("--steps", type=int, default=1)
+    ap.add_argument("--steps", type=int, default=2, help="1 이나 2. 2 가 더 칠하고 조금 느리다")
+    ap.add_argument("--similar", type=float, default=0.98, help="가만히 있을 때 건너뛰는 정도. 1 이면 끈다")
     ap.add_argument("--size", type=int, default=0, help="모델에 넣기 전 가로 크기. 0 이면 받은 그대로")
     ap.add_argument("--port", type=int, default=7010)
     args = ap.parse_args()
 
     Handler.size = args.size
-    Handler.backend = Stub() if args.backend == "stub" else Diffusion(model=args.model, steps=args.steps)
+    if args.backend == "stub":
+        Handler.backend = Stub()
+    else:
+        Handler.backend = StreamBackend(model=args.model, steps=args.steps, similar=args.similar)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"그림 덧칠 서버를 켰습니다: 127.0.0.1:{args.port} ({Handler.backend.name})")
     print("브라우저 쪽에서 조절판의 「덧칠」을 올리면 칠하기 시작합니다. 끝내려면 Ctrl+C")

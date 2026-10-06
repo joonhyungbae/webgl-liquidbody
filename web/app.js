@@ -189,8 +189,6 @@ document.addEventListener("visibilitychange", () => document.visibilityState ===
 /* ---------- 한 프레임 ---------- */
 
 const canvas = $("out");
-const over = $("over");
-const octx = over.getContext("2d");
 const paint = new Paint();
 const water = new Water();
 let view = null;
@@ -214,10 +212,6 @@ function fit() {
     canvas.width = w;
     canvas.height = h;
   }
-  if (over.width !== w || over.height !== h) {
-    over.width = w;
-    over.height = h;
-  }
 }
 
 function meter(id, v, t) {
@@ -238,7 +232,7 @@ function loop(now) {
     const movie = clip.frame();
     if (movie) view.clip(movie);
     if (text.draw(w, p)) view.text(text.canvas);
-    view.draw({
+    const u = {
       uRes: [canvas.width, canvas.height],
       uTime: now / 1000,
       uBleed: p.bleed, uGrain: p.grain, uSoak: p.soak, uSurface: p.surface,
@@ -246,11 +240,16 @@ function loop(now) {
       uWaterTop: w.waterTop, uWaterBottom: w.waterBottom, uFront: w.front,
       uRing: w.ring, uFade: w.fade, uMirror: p.mirror ? 1 : 0,
       uClipMix: movie ? p.clipMix : 0,
-    });
+    };
 
-    // 그림 모델이 다시 칠한 그림을 그 위에 천천히 겹친다
-    paint.step(dt, canvas, w, p);
-    paint.drawTo(octx, over.width, over.height, p);
+    // 그림 모델에 보낼 때가 되면 글과 덧칠을 뺀 맨그림을 한 번 그려 떠 간다
+    paint.step(dt);
+    if (paint.wants(p)) {
+      view.draw({ ...u, uRaw: 1 });
+      paint.send(canvas, w, p);
+    }
+    if (paint.layer(canvas.width, canvas.height, p)) view.paint(paint.acc);
+    view.draw({ ...u, uRaw: 0, uPaintMix: paint.amount(p) });
 
     if (!document.body.classList.contains("display")) {
       pctx.save();

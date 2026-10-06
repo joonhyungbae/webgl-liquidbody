@@ -26,6 +26,7 @@ out vec4 outColor;
 uniform sampler2D uMask;     // 몸 마스크 (R)
 uniform sampler2D uText;     // 글자 한 장 (RGBA)
 uniform sampler2D uClip;     // 작가가 만든 액체 영상 (RGBA)
+uniform sampler2D uPaint;    // 그림 모델이 다시 칠한 그림 (RGBA). paint.js 가 올린다
 uniform vec2  uRes;
 uniform float uTime;
 uniform float uBleed;        // 번짐
@@ -42,6 +43,8 @@ uniform float uRing;         // 결계. 0~1 로 퍼진다. 0 이면 없음
 uniform float uMirror;       // 1 이면 좌우를 뒤집어 거울처럼 본다
 uniform float uFade;         // 전체 밝기. 들어오고 나갈 때 쓴다
 uniform float uClipMix;      // 액체를 영상으로 보일지. 0 이면 셰이더가 만든 액체만
+uniform float uPaintMix;     // 덧칠을 얼마나 보일지. 0 이면 덧칠 없이
+uniform float uRaw;          // 1 이면 모델에 보낼 맨그림. 덧칠·글·종이결·어둠을 넣지 않는다
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
@@ -147,6 +150,13 @@ void main() {
     float ring = exp(-pow((d - r) / 0.015, 2.0));
     col += spark * ring * (1.0 - uRing) * 0.9;
   }
+
+  // 모델에 보낼 맨그림이면 여기서 끝낸다. 글을 보내면 모델이 뜻 없는 글자로 바꿔 그리고,
+  // 덧칠을 보내면 모델이 제 그림을 다시 칠해 점점 번져 나간다
+  if (uRaw > 0.5) { outColor = vec4(col, 1.0); return; }
+
+  // 덧칠. 그림 모델이 칠한 그림을 얹는다. 그림판은 위가 0 이라 글자와 같은 좌표로 읽는다
+  if (uPaintMix > 0.001) col = mix(col, texture(uPaint, uv).rgb, uPaintMix);
 
   // 글자. 움직이는 수면이 지나간 자리에서 지워진다. 물이 차오르며 글이 사라지는 자리다
   // 글자 그림판은 위가 0 이다. 화면 좌표(uv)와 같은 방향으로 읽어야 뒤집히지 않는다

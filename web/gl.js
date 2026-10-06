@@ -67,6 +67,7 @@ export function make(canvas, frag) {
   const maskTex = grayTexture(0);
   const textTex = grayTexture(1);
   const clipTex = grayTexture(2);
+  const paintTex = grayTexture(3);
   let maskSize = [0, 0];
 
   return {
@@ -94,6 +95,12 @@ export function make(canvas, frag) {
       gl.bindTexture(gl.TEXTURE_2D, clipTex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
     },
+    /* 그림 모델이 칠한 그림을 올린다 */
+    paint(canvas2d) {
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, paintTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas2d);
+    },
     draw(values) {
       gl.useProgram(prog);
       gl.bindVertexArray(vao);
@@ -101,6 +108,7 @@ export function make(canvas, frag) {
       gl.uniform1i(where("uMask"), 0);
       gl.uniform1i(where("uText"), 1);
       gl.uniform1i(where("uClip"), 2);
+      gl.uniform1i(where("uPaint"), 3);
       for (const [name, v] of Object.entries(values)) {
         const u = where(name);
         if (u === null) continue;

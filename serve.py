@@ -59,6 +59,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
+    def do_GET(self) -> None:
+        # 덧칠 서버의 상태. 브라우저가 한 장에 몇 초 걸리는지 보여 줄 때 쓴다
+        if urlparse(self.path).path == "/paint/health":
+            try:
+                with urllib.request.urlopen(f"http://{Handler.paint}/health", timeout=3) as r:
+                    out = r.read()
+            except Exception:
+                self.send_error(503, "paint unreachable")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(out)))
+            self.end_headers()
+            self.wfile.write(out)
+            return
+        super().do_GET()
+
     def do_POST(self) -> None:
         url = urlparse(self.path)
 
