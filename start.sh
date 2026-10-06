@@ -20,6 +20,8 @@ source scripts/conda.sh
 
 CONDA="$(find_conda)" || { echo "conda 가 없습니다. 먼저 설치해 주세요:  bash install.sh" >&2; exit 1; }
 env_exists "$CONDA" || { echo "conda 환경($ENV_NAME)이 없습니다. 먼저 설치해 주세요:  bash install.sh" >&2; exit 1; }
+# 사용자 폴더(~/.local)에 따로 깐 파이썬 패키지가 conda 환경에 섞이지 않게 한다
+export PYTHONNOUSERSITE=1
 py() { "$CONDA" run --no-capture-output -n "$ENV_NAME" python "$@"; }
 
 # 모델이 없으면 한 번 받아 본다. 못 받아도 가짜 사람으로는 돈다.
@@ -60,4 +62,5 @@ fi
 
 [ -n "$QUERY" ] && ARGS+=(--query "$QUERY")
 
-py serve.py "${ARGS[@]}"
+# 빈 배열을 그냥 펼치면 맥의 bash 3.2 가 set -u 에서 멈춘다. + 꼴로 감싼다
+py serve.py ${ARGS[@]+"${ARGS[@]}"}

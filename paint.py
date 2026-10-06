@@ -11,6 +11,7 @@
   python3 paint.py --size 384          모델에 넣기 전에 이 가로로 줄인다
   python3 paint.py --similar 0.98      가만히 있을 때 건너뛰는 정도. 1 이면 건너뛰지 않는다
   python3 paint.py --port 7010         포트를 바꾼다
+  python3 paint.py --fetch             그림 모델만 받아 두고 끝낸다. install.sh --paint 가 쓴다
 
 왜 StreamDiffusion 방식인가
   보통의 img2img 는 한 장마다 모델을 처음부터 다시 준비해서, 매 프레임 돌리면 느리고 떨린다.
@@ -18,8 +19,9 @@
   떨리게 칠한다. 자세한 것은 stream.py 맨 위에 있다.
 
 모델 깔기
-  pip install torch diffusers transformers accelerate
-  처음 켤 때 모델을 받는다(sd-turbo 약 2.5GB, TAESD 약 10MB). 그다음부터는 받아 둔 것을 쓴다.
+  ./install.sh --paint (윈도우는 .\install.ps1 --paint) 가 conda 환경에 torch 와 diffusers 를
+  깔고 그림 모델(sd-turbo 약 2.5GB, TAESD 약 10MB)까지 받아 둔다. 그냥 pip install 을 하면
+  conda 환경 밖에 깔려서 이 서버가 찾지 못한다.
   돌아가는 자리는 알아서 고른다. NVIDIA 면 cuda, 맥이면 mps 다.
 """
 
@@ -91,8 +93,10 @@ class StreamBackend:
         try:
             from stream import Stream
         except ImportError:
-            print("torch 와 diffusers 가 없습니다. 다음을 깔거나 --backend stub 으로 켭니다:")
-            print("  pip install torch diffusers transformers accelerate")
+            print("torch 와 diffusers 가 이 환경에 없습니다. 저장소 폴더에서 한 번 깔아 주세요:")
+            print("  ./install.sh --paint          (맥 · 리눅스)")
+            print("  .\\install.ps1 --paint        (윈도우)")
+            print("덧칠 없이 받은 그림을 그대로 돌려줍니다.")
             return
         print(f"그림 모델을 올립니다: {model}. 처음에는 몇 분 걸립니다.")
         self.stream = Stream(model=model, steps=steps, similar=similar)
@@ -213,6 +217,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
+def fetch(model: str, vae: str) -> None:
+    """그림 모델을 받아 두기만 한다. 전시장에서 처음 켤 때 몇 분씩 기다리지 않게."""
+    try:
+        from diffusers import AutoencoderTiny, StableDiffusionPipeline
+    except ImportError:
+        sys.exit("torch 와 diffusers 가 없습니다. ./install.sh --paint 로 깝니다.")
+    print(f"그림 모델을 받습니다: {model} (약 2.5GB). 한 번만 받으면 됩니다.")
+    path = StableDiffusionPipeline.download(model)
+    print(f"받았습니다: {path}")
+    print(f"작은 VAE 를 받습니다: {vae} (약 10MB)")
+    AutoencoderTiny.from_pretrained(vae)
+    print("다 받았습니다. ./start.sh --paint 로 켭니다.")
+
+
 def main() -> None:
     sys.stdout.reconfigure(line_buffering=True)
     ap = argparse.ArgumentParser(description="화면을 받아 다시 칠해 돌려준다")
@@ -222,7 +240,11 @@ def main() -> None:
     ap.add_argument("--similar", type=float, default=0.98, help="가만히 있을 때 건너뛰는 정도. 1 이면 끈다")
     ap.add_argument("--size", type=int, default=0, help="모델에 넣기 전 가로 크기. 0 이면 받은 그대로")
     ap.add_argument("--port", type=int, default=7010)
+    ap.add_argument("--fetch", action="store_true", help="그림 모델만 받아 두고 끝낸다")
     args = ap.parse_args()
+    if args.fetch:
+        fetch(args.model, "madebyollin/taesd")
+        return
 
     Handler.size = args.size
     if args.backend == "stub":

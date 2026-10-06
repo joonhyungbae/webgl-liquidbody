@@ -14,3 +14,6 @@ web/sample/
 # 작가가 만든 액체 영상은 커밋하지 않는다.
 web/clips/*
 !web/clips/README.md
+
+# install.sh --paint 가 남기는 표시. start.command 가 본다
+.paint

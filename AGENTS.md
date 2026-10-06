@@ -20,7 +20,12 @@ Cursor, Claude Code, Codex 등 어떤 도구로 들어왔든 이 파일을 먼�
 ```bash
 ./start.sh --sim          # 카메라 없이. 앉은 사람의 윤곽이 숨 쉰다
 ./start.sh --offline 20   # 20초를 녹화해 out 파일로. 검증에 제일 빠르다
+./install.sh --paint      # 덧칠을 쓰려면 한 번. torch 를 conda 환경 안에 깔고 그림 모델을 받는다
+./start.sh --sim --paint  # 덧칠까지 켜서 본다
 ```
+
+덧칠에 쓰는 패키지를 `pip install` 로 따로 깔지 않는다. conda 환경 밖에 깔리면 `paint.py` 가
+찾지 못하고 조용히 덧칠 없이 돈다. 늘 `install.sh --paint` 로 깐다.
 
 고친 뒤에는 `--sim` 으로 띄워 단계가 넘어가는지, 콘솔에 에러가 없는지 봅니다.
 
